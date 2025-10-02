@@ -1,0 +1,28 @@
+{
+    "terminal.integrated.defaultProfile.linux": "bash",
+    "terminal.integrated.profiles.linux": {
+        "bash": {
+            "path": "bash",
+            "args": [
+                "-l"
+            ],
+            "env": {
+                "PROJECT_BASE": "/home/song/Sandbox/github-action-example"
+            }
+        }
+    },
+    "files.exclude": {
+        "**/.git": true,
+        "**/.zip": true
+    },
+    "files.associations": {
+        "*.yml": "yaml"
+    },
+    "[yaml]": {
+        "editor.tabSize": 2,
+        "editor.detectIndentation": false
+    },
+    "python.terminal.activateEnvironment": false,
+    "python.languageServer": "Default",
+    "gitlens.mode.active": "zen"
+}

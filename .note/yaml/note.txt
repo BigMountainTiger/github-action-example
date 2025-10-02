@@ -1,0 +1,9 @@
+vscode
+-------------------------------------------------------
+extension - Search for YAML => YAML Language Support by Red Hat, with built-in Kubernetes syntax support
+vscode settings - file association -> .yml => yaml
+
+
+tutorial
+-------------------------------------------------------
+https://www.youtube.com/watch?v=BEki_rsWu4E
