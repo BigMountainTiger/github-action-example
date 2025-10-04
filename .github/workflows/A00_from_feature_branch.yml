@@ -1,0 +1,23 @@
+# 1.
+# A workflow is not visible in the github web page only when it is in the default branch
+# But we can trigger it through on:push event like this example:
+
+# 2.
+# aws cli is installed by default
+
+# 3.
+# we can specfy the ubuntu version, other than the "-latest"
+
+name: A00_from_feature_branch
+on:
+  push:
+    # Need to push from feature/example branch to trigger the workflow
+    branches: [feature/example]
+    paths:
+      - "**"
+
+jobs:
+  basic:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: aws --version

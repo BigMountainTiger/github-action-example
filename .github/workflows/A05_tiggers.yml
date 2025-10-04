@@ -1,0 +1,32 @@
+name: A05_tiggers
+
+on:
+  # push:
+  #   branches: [develop, release, master]
+  #   paths:
+  #     - "**"
+  # pull_request:
+  #   branches: [develop, release, master]
+  #   paths:
+  #     - "**"
+  workflow_dispatch:
+    inputs:
+      branch:
+        type: choice
+        description: "Git branch"
+        required: true
+        options: [develop, release, master]
+        default: develop
+
+jobs:
+  echo_environment_variables:
+    runs-on: ubuntu-latest
+    env:
+      branch: ${{ github.event.inputs.branch || github.ref_name }}
+    steps:
+      - name: Export the environment varisbles
+        run: |
+          branch_name="${{ env.branch }}"
+          echo branch_name="$branch_name" >> $GITHUB_ENV
+      - name: Use the environment varisbles
+        run: echo ${{ env.branch_name }}

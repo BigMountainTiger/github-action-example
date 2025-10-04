@@ -1,0 +1,29 @@
+name: A04_environment_variables
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        type: choice
+        description: "Git branch"
+        required: true
+        options:
+          - develop
+          - release
+          - master
+        default: develop
+
+jobs:
+  echo_environment_variables:
+    runs-on: ubuntu-latest
+    env:
+      branch: ${{ github.event.inputs.branch }}
+      ENV: >
+        ${{ github.event.inputs.branch == 'develop' && 'dev' ||
+          github.event.inputs.branch == 'release' && 'qa' ||
+          github.event.inputs.branch == 'master' && 'prod' }}
+    steps:
+      - name: print the environment varisbles
+        run: |
+          echo ${{ env.branch }}
+          echo ${{ env.ENV }}

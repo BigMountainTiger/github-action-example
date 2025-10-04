@@ -1,0 +1,24 @@
+name: A02_checkout_code
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        type: choice
+        description: "Git branch"
+        required: true
+        options:
+          - develop
+          - release
+          - master
+        default: develop
+
+jobs:
+  checkout_from_github:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.branch }}
+      - run: ls -la
