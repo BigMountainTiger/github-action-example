@@ -1,0 +1,28 @@
+In GitHub Actions, jobs are independent units of execution within a workflow.
+By default, if you define multiple jobs, they run in parallel on separate virtual machines or runners
+
+Parallel vs. Sequential Execution
+-----------------------------------------
+1. Parallel (Default): Use this when jobs don't depend on each other (e.g., running tests on Linux and Windows simultaneously)
+2. Sequential (Dependency): Use the needs keyword to make one job wait for another.
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+  build:
+    needs: setup  # Only starts after 'setup' finishes
+    runs-on: ubuntu-latest
+
+
+Key Features for Multiple Jobs
+------------------------------------------
+1. Data Sharing: Since each job runs on a fresh runner, files do not persist between them. To share data, use upload-artifact and download-artifact
+2. Job Matrix: Automatically create multiple jobs based on variations (e.g., testing across 5 different Node.js versions)
+3. Conditionals: Control if a job runs using the if keyword. For example, if: always() ensures a job runs even if a previous dependent job failed.
+4. Outputs: Use jobs.<job_id>.outputs to pass specific strings or variables from one job to another.
+5. Concurrency: Limit how many instances of a job run at once using the concurrency keyword, which is useful for preventing overlapping deployments.
+
+Execution Limits
+------------------------------------------
+1. Time: Each individual job can run for up to 6 hours before it is automatically terminated
+2. Workflow Total: A single workflow run can generate up to 256 jobs via a matrix strategy.

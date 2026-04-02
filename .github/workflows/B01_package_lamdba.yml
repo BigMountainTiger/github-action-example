@@ -1,0 +1,25 @@
+name: B01_package_lamdba
+
+on:
+  workflow_dispatch:
+    inputs:
+      lambda_name:
+        type: string
+        description: Lambda name
+        required: true
+
+jobs:
+  Package_python_lambda:
+    runs-on: ubuntu-latest
+    env:
+      python_version: 3.12
+      lambda_name: ${{ github.event.inputs.lambda_name }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+      - run: ls -la
+      - name: package lambda
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.python_version }}
+      - run: .github/workflows/scripts/python/deploy-lambda "${{ env.lambda_name }}"

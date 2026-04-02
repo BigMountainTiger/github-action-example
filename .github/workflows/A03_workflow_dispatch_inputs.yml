@@ -1,0 +1,30 @@
+name: A03_workflow_dispatch_inputs
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: "Deployment environment"
+        required: true
+        options:
+          - develop
+          - release
+          - production
+      lambda_name:
+        type: string
+        description: Lambda name
+        default: lambda_example
+        required: true
+      run_tests:
+        type: boolean
+        description: "Run automated tests?"
+        default: false
+
+jobs:
+  echo_input_values:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ github.event.inputs.environment }}
+      - run: echo ${{ github.event.inputs.lambda_name }}
+      - run: echo ${{ github.event.inputs.run_tests }}

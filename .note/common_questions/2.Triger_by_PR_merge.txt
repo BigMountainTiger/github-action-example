@@ -1,0 +1,22 @@
+-----------------------------
+1. This is the most reliable way to run a job specifically when a PR is merged into a target branch
+
+on:
+  pull_request:
+    branches: [develop, release, master]
+    types: [closed]
+
+jobs:
+  on-merge:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "The PR was merged!"
+
+-----------------------------
+2. If your workflow should run on any new code reaching a branch (whether via PR merge or direct push), use the push event.
+
+on:
+  push:
+    branches:
+      - master

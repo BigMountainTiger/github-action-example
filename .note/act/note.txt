@@ -1,0 +1,21 @@
+Install github cli - gh
+---------------------------------------------------
+
+sudo apt update
+sudo apt install gh
+
+After install, need to login the github to continue
+
+gh auth login
+gh auth logout
+
+Install act
+---------------------------------------------------
+
+gh extension install https://github.com/nektos/gh-act
+gh extension remove gh-act
+
+
+Conclustion:
+---------------------------------------------------
+Very heavy weight, it is better just run the jobs on github

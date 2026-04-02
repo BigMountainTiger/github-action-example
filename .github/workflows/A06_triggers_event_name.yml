@@ -1,0 +1,17 @@
+name: A06_triggers_event_name
+
+on:
+  # push:
+  #   branches: [develop, release, master]
+  #   paths:
+  #     - "**"
+  workflow_dispatch:
+
+jobs:
+  echo_event_name:
+    runs-on: ubuntu-latest
+    env:
+      event_name: ${{ github.event_name }}
+    steps:
+      - run: |
+          echo ${{ env.event_name }}

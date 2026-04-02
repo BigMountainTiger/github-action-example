@@ -1,0 +1,14 @@
+Which YAML branch is used by GitHub Actions?
+
+1. It depends on the type of the event that triggers the workflow
+2. A general rule, GitHub searches for workflow files in the .github/workflows directory of the branch associated with the triggering event
+
+----------------------------------------------------
+1. Push Events: The workflow runs using the version of the YAML file found in the branch that was pushed to
+2. Pull Request Events: The workflow typically uses the YAML file from the source/feature branch (the branch being merged)
+    to allow testing changes before they reach the main branch
+3. Scheduled Events (schedule): These workflows only run using the YAML file located on the default branch (usually main or master)
+4. Manual Events (workflow_dispatch): When triggered manually through the GitHub Actions tab,
+    you can select the specific branch from which to run the workflow
+5. Other Events: For most repository-level events (like issues or release),
+    the workflow must be present on the default branch to be recognized
