@@ -1,0 +1,9 @@
+1. If a GitHub Action workflow YAML file is deleted from all branches,
+    it will no longer be available to trigger new runs
+
+2. The workflow entry and its historical data may still appear in the Actions tab for a period of time
+
+3. To make the workflow name vanish from the sidebar immediately after deleting the YAML,
+    you must delete all individual workflow runs associated with it
+
+    gh run delete --all --workflow <workflow-id-or-filename>
