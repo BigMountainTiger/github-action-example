@@ -6,5 +6,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: whoami
+      - run: |
+          echo "jq is installed by default"
+          jq --version
       - run: pwd
       - run: ls -la

@@ -1,0 +1,31 @@
+-------------------------------------------------------------------
+1. This is the most reliable way to run a job specifically when a PR is merged into a target branch
+
+on:
+  pull_request:
+    branches: [develop, release, master]
+    types: [closed]
+
+jobs:
+  on-merge:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "The PR was merged!"
+
+-------------------------------------------------------------------
+2. If your workflow should run on any new code reaching a branch (whether via PR merge or direct push), use the push event.
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'my-directory/**'  # Triggers only for changes in this folder
+
+
+
+File path matching
+-------------------------------------------------------------------
+double asterisk (**) - Unlike a single asterisk (*), which matches files within a single directory level,
+  the double star matches zero or more directories and subdirectories deep into the file tree

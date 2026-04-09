@@ -1,0 +1,55 @@
+name: A08_matrix
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prepare_matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      branches: ${{ steps.set-matrix.outputs.branches }}
+      directories: ${{ steps.set-matrix.outputs.directories }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v6
+        with:
+          ref: master
+          fetch-depth: 2
+      - id: set-matrix
+        run: |
+          branches=("master")
+          branches="$(jq -n '$ARGS.positional' -c '.' --args "${branches[@]}")"
+
+          directories=($(git diff --name-only HEAD^1 HEAD | grep / | cut -d/ -f1,2 | sort -u))
+          directories="$(jq -n '$ARGS.positional' -c '.' --args "${directories[@]}")"
+
+          echo "branches=$branches" >> $GITHUB_OUTPUT
+          echo "directories=$directories" >> $GITHUB_OUTPUT
+
+  actual_job:
+    needs: prepare_matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ${{ fromJson(needs.prepare_matrix.outputs.branches) }}
+        directory: ${{ fromJson(needs.prepare_matrix.outputs.directories) }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "directory=${{ matrix.directory }}">> $GITHUB_ENV
+          echo "branch=${{ matrix.branch }}">> $GITHUB_ENV
+
+      - name: Check out
+        uses: actions/checkout@v6
+        with:
+          ref: "${{ env.branch }}"
+          sparse-checkout: ${{ env.directory }}
+          fetch-depth: 1
+
+      - run: |
+          ls -la
+
+          cd $directory && pwd
+          ls -la
+
+          echo "Running tests for directory: $directory on branch: $branch"

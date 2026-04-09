@@ -1,4 +1,7 @@
 name: A04_environment_variables
+env:
+  # Global environment variables can be defineed here
+  global_env: "This is a global environment variable"
 
 on:
   workflow_dispatch:
@@ -27,7 +30,19 @@ jobs:
           branch=${{ github.event.inputs.branch }}
           echo "branch=$branch" >> $GITHUB_ENV
 
+          echo What is the \$GITHUB_ENV file content?
+          echo $GITHUB_ENV
+          cat $GITHUB_ENV
+
       - name: print the environment varisbles
         run: |
+          echo $global_env
           echo $branch
           echo $ENV
+
+      - name: Use the environment variable in step configuration
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.branch }}
+
+      - run: git branch --show-current

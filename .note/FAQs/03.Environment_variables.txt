@@ -1,0 +1,33 @@
+------------------------------------------------------------------
+Environment variables $GITHUB_ENV are not shared among the jobs
+
+------------------------------------------------------------------
+Environment variables can be set in two ways:
+1. in the "env" section of the job definition
+2. use bash syntax => 'echo "branch=$branch" >> $GITHUB_ENV' in the "run" section of a step
+
+
+------------------------------------------------------------------
+Environment variables can be used in two ways as well:
+1. in the step definition using the '${{ env.branch }}' syntax
+2. in the "run" section of a step, directly access it as an environment variable by bash syntax - ie. "$branch"
+
+
+------------------------------------------------------------------
+Global Environment variable
+Set at the workflow level
+
+name: CI Workflow
+env:
+  GLOBAL_VAR: "my-global-value"  # Accessible in all jobs/steps
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Use Variable
+        run: echo "The value is $GLOBAL_VAR"
+
+
+------------------------------------------------------------------
+* reference the workflow .github/workflows/A04_environment_variables.yml
