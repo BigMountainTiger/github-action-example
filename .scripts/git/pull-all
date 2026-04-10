@@ -1,0 +1,17 @@
+#!/bin/bash
+
+git fetch
+ACTIVE_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+pull() {
+  BRANCH="$1"
+  git checkout "$BRANCH"
+  git pull
+  echo
+}
+
+pull master
+
+echo
+git checkout $ACTIVE_BRANCH
+git pull

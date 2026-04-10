@@ -1,0 +1,4 @@
+concurrency can be controlled at both workflow level and job level
+
+- https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency 
+- refer to A09_concurrency.yml exmple

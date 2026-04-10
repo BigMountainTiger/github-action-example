@@ -20,7 +20,7 @@ jobs:
           branches=("master")
           branches="$(jq -n '$ARGS.positional' -c '.' --args "${branches[@]}")"
 
-          directories=($(git diff --name-only HEAD^1 HEAD | grep / | cut -d/ -f1,2 | sort -u))
+          directories=($(git diff --relative --name-only HEAD^1 HEAD | grep / | cut -d/ -f1 | sort -u))
           directories="$(jq -n '$ARGS.positional' -c '.' --args "${directories[@]}")"
 
           echo "branches=$branches" >> $GITHUB_OUTPUT
