@@ -2,6 +2,7 @@ name: A04_environment_variables
 env:
   # Global environment variables can be defineed here
   global_env: "This is a global environment variable"
+  s3_bucket_name_template: "my-app-bucket-{env}"
 
 on:
   workflow_dispatch:
@@ -14,21 +15,26 @@ on:
           - develop
           - release
           - master
-        default: develop
+        default: master
 
 jobs:
   echo_environment_variables:
     runs-on: ubuntu-latest
     env:
-      ENV: >
-        ${{ github.event.inputs.branch == 'develop' && 'dev' ||
+      ENV: >-
+        ${{ 
+          github.event.inputs.branch == 'develop' && 'dev' ||
           github.event.inputs.branch == 'release' && 'qa' ||
-          github.event.inputs.branch == 'master' && 'prod' }}
+          github.event.inputs.branch == 'master' && 'prod'
+        }}
     steps:
       - name: Set environment variables
         run: |
           branch=${{ github.event.inputs.branch }}
           echo "branch=$branch" >> $GITHUB_ENV
+
+          variable_with_spaces="This variable has spaces"
+          echo "variable_with_spaces=$variable_with_spaces" >> $GITHUB_ENV
 
           echo What is the \$GITHUB_ENV file content?
           echo $GITHUB_ENV
@@ -46,3 +52,14 @@ jobs:
           ref: ${{ env.branch }}
 
       - run: git branch --show-current
+
+      - name: Use template string to create environment variable
+        run: |
+          echo $s3_bucket_name_template
+
+          echo duble slash replaces all occurrences of {env} with $ENV
+          echo "S3 bucket name: ${s3_bucket_name_template//\{env\}/$ENV}"
+
+          echo
+          echo single slash replaces the first occurrence of {env} with $ENV
+          echo "S3 bucket name: ${s3_bucket_name_template/\{env\}/$ENV}"

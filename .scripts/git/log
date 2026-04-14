@@ -1,0 +1,8 @@
+#!/bin/bash
+
+git fetch
+if [[ $# -eq 0 ]]; then
+  git log -2
+else
+  git log "$@"
+fi

@@ -1,0 +1,48 @@
+name: A09_multiple_trigger
+
+on:
+  push:
+    branches: [non-exist-to-stop-workflow]
+    paths:
+      - "**"
+
+  workflow_dispatch:
+    inputs:
+      branch:
+        type: choice
+        description: "Git branch"
+        required: true
+        options: [master, release, develop]
+        default: master
+      lambda_names:
+        type: string
+        description: "Comma separated Lambda folder names to deploy (leave empty to deploy changed by the last commit)"
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.branch || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  what_are_we_receiving:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          branch="${{ inputs.branch || github.ref_name }}"
+          read -r input_lambda_names <<< "${{ inputs.lambda_names }}"
+
+          echo "Event name: ${{ github.event_name }}"
+          echo "Branch: $branch"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Run number: ${{ github.run_number }}"
+
+          echo "branch=$branch" >> $GITHUB_ENV
+          echo "input_lambda_names=$input_lambda_names" >> $GITHUB_ENV
+
+          cat $GITHUB_ENV
+
+      - run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "$input_lambda_names" != "" ]]; then
+            echo "User provided lambda names: $input_lambda_names"
+          fi
