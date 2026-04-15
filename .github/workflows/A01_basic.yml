@@ -11,3 +11,7 @@ jobs:
           jq --version
       - run: pwd
       - run: ls -la
+      - run: |
+          echo "::notice:: This is a notice"
+          echo "::warning:: This is a warning"
+          echo "::error:: This is an error"

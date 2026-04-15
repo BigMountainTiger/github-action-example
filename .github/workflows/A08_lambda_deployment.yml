@@ -1,0 +1,247 @@
+name: A08_lambda_deployment
+env:
+  PRODUCT_NAME: A08_lambda_deployment
+  WORKING_DIRECTORY: examples/python
+  DEFAULT_PYTHON_VERSION: 3.14
+
+on:
+  push:
+    branches: [OK]
+    paths:
+      - "**"
+
+  workflow_dispatch:
+    inputs:
+      branch-to-deploy:
+        type: choice
+        description: "Choose the branch to deploy"
+        required: true
+        options: [master, release, develop]
+        default: master
+      lambda_names:
+        type: string
+        description: |
+          Comma separated Lambda folder names,
+          leave empty to deploy changes in the last pull request
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.branch-to-deploy || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deployment_launcher:
+    name: Deployment Launcher
+    runs-on: ubuntu-latest
+    outputs:
+      branches: ${{ steps.launch_jobs.outputs.branches }}
+      directories: ${{ steps.launch_jobs.outputs.directories }}
+    steps:
+      - name: Triggered by ${{ github.event_name }} event
+        run: |
+          BRANCH_NAME="${{ inputs.branch-to-deploy || github.ref_name }}"
+          INPUT_LAMBDA_NAMES="$(echo "${{ inputs.lambda_names }}" | xargs)"
+
+          echo "Branch to deploy: $BRANCH_NAME"
+          echo "Input Lambda names: ${INPUT_LAMBDA_NAMES:-NA}"
+
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "INPUT_LAMBDA_NAMES=$INPUT_LAMBDA_NAMES" >> $GITHUB_ENV
+
+      - name: Check out
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.BRANCH_NAME }}
+          fetch-depth: 2
+
+      - name: Get lambda directories from github action input
+        if: env.INPUT_LAMBDA_NAMES != ''
+        run: |
+          echo "::notice::You manually specified lambda names: '$INPUT_LAMBDA_NAMES'"
+
+          cd "${{ env.WORKING_DIRECTORY }}"
+
+          IFS=',' read -ra INPUT_LAMBDA_DIRS <<< "${INPUT_LAMBDA_NAMES}"
+          LAMBDA_DIRS=()
+          for d in "${INPUT_LAMBDA_DIRS[@]}"; do
+            d="$(echo "$d" | xargs)"
+            if [[ -n "$d" ]]; then
+
+                if [[ (! -d "$d") || ("$d" == */*) || ("$d" == *.*) ]]; then
+                  echo "::notice::Directory name '$d' is not a valid lambda directory name"
+                  continue
+                fi
+
+                LAMBDA_DIRS+=("$d")
+            fi
+          done
+
+          LAMBDA_DIRS="$(printf "%s\n" "${LAMBDA_DIRS[@]}" | sort -u)"
+          if [[ -z "$LAMBDA_DIRS" ]]; then
+            LAMBDA_DIRS=()
+          else
+            mapfile -t LAMBDA_DIRS <<<"$LAMBDA_DIRS"
+          fi
+
+          if [[ ${#LAMBDA_DIRS[@]} == 0 ]]; then
+            msg="No valid directory in the input"
+            msg="$msg, No deployment launched"
+            msg="$msg. Please make sure to put in the correct lambda directory names"
+
+            echo "::notice::$msg"
+          fi
+
+          LAMBDA_DIRS="$(jq -n '$ARGS.positional' -c '.' --args "${LAMBDA_DIRS[@]}")"
+          echo "LAMBDA_DIRS=$LAMBDA_DIRS" >> $GITHUB_ENV
+
+      - name: Get lambda directories from the last git commit
+        if: env.INPUT_LAMBDA_NAMES == ''
+        run: |
+          echo "::notice::Auto-detecting lambda directories changed in the last commit in the '$BRANCH_NAME' branch"
+
+          cd "${{ env.WORKING_DIRECTORY }}"
+
+          mapfile -t DIRECTORIES <<< "$(git diff --relative --name-only HEAD^1 HEAD | grep / | cut -d/ -f1 | sort -u)"
+          LAMBDA_DIRS=()
+          for d in "${DIRECTORIES[@]}"; do
+            d="$(echo "$d" | xargs)"
+            if [[ -n "$d" ]]; then
+              LAMBDA_DIRS+=("$d")
+            fi
+          done
+
+          if [[ ${#LAMBDA_DIRS[@]} == 0 ]]; then
+            msg="No lambda directory change detected in the last commit"
+            msg="$msg, No deployment launched"
+            msg="$msg. But you can always force a deployment by manually starting the workflow and providing the directory names"
+
+            echo "::notice::$msg"
+          fi
+
+          LAMBDA_DIRS="$(jq -n '$ARGS.positional' -c '.' --args "${LAMBDA_DIRS[@]}")"
+          echo "LAMBDA_DIRS=$LAMBDA_DIRS" >> $GITHUB_ENV
+
+      - name: Launch jobs
+        id: launch_jobs
+        run: |
+          branches=("${{ env.BRANCH_NAME }}")
+          branches="$(jq -n '$ARGS.positional' -c '.' --args "${branches[@]}")"
+
+          echo "branches=$branches" >> $GITHUB_OUTPUT
+          echo "directories=$LAMBDA_DIRS" >> $GITHUB_OUTPUT
+
+  deployment:
+    name: Deployment
+    needs: deployment_launcher
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ${{ fromJson(needs.deployment_launcher.outputs.branches) }}
+        directory: ${{ fromJson(needs.deployment_launcher.outputs.directories) }}
+    runs-on: ubuntu-latest
+    if: ${{ needs.deployment_launcher.outputs.directories != '[]' }}
+    steps:
+      - name: Starting deployment job for ${{ matrix.directory }} on branch ${{ matrix.branch }}
+        run: |
+          BRANCH_NAME="${{ matrix.branch }}"
+          LAMBDA_DIRECTORY="${{ matrix.directory }}"
+
+          declare -A branch_env_map=(
+            ["develop"]="dev"
+            ["release"]="qa"
+            ["master"]="prod"
+          )
+
+          DEPLOY_ENV="${branch_env_map[$BRANCH_NAME]}"
+          LAMBDA_NAME="$LAMBDA_DIRECTORY-$DEPLOY_ENV"
+
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "DEPLOY_ENV=$DEPLOY_ENV" >> $GITHUB_ENV
+          echo "LAMBDA_NAME=$LAMBDA_NAME" >> $GITHUB_ENV
+          echo "LAMBDA_FULL_DIRECTORY=${{ env.WORKING_DIRECTORY }}/$LAMBDA_DIRECTORY" >> $GITHUB_ENV
+
+      - name: Check out
+        uses: actions/checkout@v6
+        with:
+          ref: "${{ env.BRANCH_NAME }}"
+          sparse-checkout: "${{ env.LAMBDA_FULL_DIRECTORY }}"
+          fetch-depth: 1
+
+      - name: Check if custom python version specified
+        run: |
+          if [[ ! -d "$LAMBDA_FULL_DIRECTORY" ]]; then
+            echo "$LAMBDA_FULL_DIRECTORY does not exist" >&2
+            exit 1
+          fi
+
+          cd "$LAMBDA_FULL_DIRECTORY"
+
+          version_file="custom/VERSION.txt"
+          if [[ -f "$version_file" ]]; then
+            PYTHON_VERSION="$(cat $version_file | xargs)"
+            PYTHON_VERSION="${PYTHON_VERSION,,}"
+            PYTHON_VERSION="${PYTHON_VERSION#python}"
+
+            echo "Custom python version $PYTHON_VERSION will be used"
+          else
+            PYTHON_VERSION="${{ env.DEFAULT_PYTHON_VERSION }}"
+
+            echo "Default python version $PYTHON_VERSION will be used"
+          fi
+
+          echo "PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+
+      - name: install python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - run: python --version
+
+      - name: package lambda
+        run: |
+          WORKSPACE=".lambda_package_zip"
+          PACKAGE_FILE_NAME="lambda.zip"
+
+          (
+            rm -rf $WORKSPACE && mkdir -p $WORKSPACE
+            cp -r $LAMBDA_FULL_DIRECTORY $WORKSPACE/lambda
+          )
+
+          (
+            REQUIREMENTS="requirements.txt"
+            cd $WORKSPACE/lambda
+
+            custom_install="custom/install"
+            if [[ -f "$custom_install" ]]; then
+              echo "Found custom install script, using it to install the dependencies"
+              . "$custom_install"
+            else
+              if [ -f "$REQUIREMENTS" ]; then
+                if ! [ -x "$(command -v pip)" ]; then
+                    echo 'pip is not installed, we need pip to create the deployment package' >&2
+                    exit 1
+                fi
+
+                pip install --platform=manylinux2014_x86_64 --only-binary=:all: \
+                  -r "$REQUIREMENTS" -t .
+              fi
+            fi
+
+            find . -type d -name "__pycache__" -exec rm -rf {} +
+            rm -f $REQUIREMENTS
+            rm -rf custom
+
+            ZIP_FILE="../$PACKAGE_FILE_NAME"
+            zip -rq $ZIP_FILE .
+
+            du -h $ZIP_FILE
+            echo "Created the deployment package"
+          )
+
+          echo "LAMBDA_PACKAGE_FILE_PATH=$WORKSPACE/$PACKAGE_FILE_NAME" >> $GITHUB_ENV
+
+      - name: Deploy lambda
+        run: |
+
+          ls -l "${{ env.LAMBDA_PACKAGE_FILE_PATH }}"
