@@ -6,7 +6,7 @@ env:
 
 on:
   push:
-    branches: [OK]
+    branches: [ OK ]
     paths:
       - "**"
 
@@ -16,7 +16,7 @@ on:
         type: choice
         description: "Choose the branch to deploy"
         required: true
-        options: [master, release, develop]
+        options: [ master, release, develop ]
         default: master
       lambda_names:
         type: string
@@ -32,7 +32,7 @@ concurrency:
 jobs:
   deployment_launcher:
     name: Deployment Launcher
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNERSET_DEFAULT }}
     outputs:
       branches: ${{ steps.launch_jobs.outputs.branches }}
       directories: ${{ steps.launch_jobs.outputs.directories }}
@@ -40,13 +40,13 @@ jobs:
       - name: Triggered by ${{ github.event_name }} event
         run: |
           BRANCH_NAME="${{ inputs.branch-to-deploy || github.ref_name }}"
-          INPUT_LAMBDA_NAMES="$(echo "${{ inputs.lambda_names }}" | xargs)"
+          WORKFLOW_DISPATCH_INPUT_DIRECTORIES="$(echo "${{ inputs.workflow-dispatch-input-directories }}" | xargs)"
 
-          echo "Branch to deploy: $BRANCH_NAME"
-          echo "Input Lambda names: ${INPUT_LAMBDA_NAMES:-NA}"
+          echo "::notice::Branch to deploy: $BRANCH_NAME"
+          echo "::notice::The workflow_dispatch input directory names: ${WORKFLOW_DISPATCH_INPUT_DIRECTORIES:-NA}"
 
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-          echo "INPUT_LAMBDA_NAMES=$INPUT_LAMBDA_NAMES" >> $GITHUB_ENV
+          echo "WORKFLOW_DISPATCH_INPUT_DIRECTORIES=$WORKFLOW_DISPATCH_INPUT_DIRECTORIES" >> $GITHUB_ENV
 
       - name: Check out
         uses: actions/checkout@v6
@@ -54,72 +54,70 @@ jobs:
           ref: ${{ env.BRANCH_NAME }}
           fetch-depth: 2
 
-      - name: Get lambda directories from github action input
-        if: env.INPUT_LAMBDA_NAMES != ''
+      - name: Get directories from workflow_dispatch input
+        if: env.WORKFLOW_DISPATCH_INPUT_DIRECTORIES != ''
         run: |
-          echo "::notice::You manually specified lambda names: '$INPUT_LAMBDA_NAMES'"
-
           cd "${{ env.WORKING_DIRECTORY }}"
 
-          IFS=',' read -ra INPUT_LAMBDA_DIRS <<< "${INPUT_LAMBDA_NAMES}"
-          LAMBDA_DIRS=()
-          for d in "${INPUT_LAMBDA_DIRS[@]}"; do
+          IFS=',' read -ra INPUT_DIRS <<< "${WORKFLOW_DISPATCH_INPUT_DIRECTORIES}"
+          SELECTED_DIRS=()
+          for d in "${INPUT_DIRS[@]}"; do
             d="$(echo "$d" | xargs)"
             if [[ -n "$d" ]]; then
 
                 if [[ (! -d "$d") || ("$d" == */*) || ("$d" == *.*) ]]; then
-                  echo "::notice::Directory name '$d' is not a valid lambda directory name"
+                  echo "::warning::Directory name '$d' is not valid and will be ignored"
                   continue
                 fi
 
-                LAMBDA_DIRS+=("$d")
+                SELECTED_DIRS+=("$d")
             fi
           done
 
-          LAMBDA_DIRS="$(printf "%s\n" "${LAMBDA_DIRS[@]}" | sort -u)"
-          if [[ -z "$LAMBDA_DIRS" ]]; then
-            LAMBDA_DIRS=()
+          SELECTED_DIRS="$(printf "%s\n" "${SELECTED_DIRS[@]}" | sort -u)"
+          if [[ -z "$SELECTED_DIRS" ]]; then
+            SELECTED_DIRS=()
           else
-            mapfile -t LAMBDA_DIRS <<<"$LAMBDA_DIRS"
+            mapfile -t SELECTED_DIRS <<<"$SELECTED_DIRS"
           fi
 
-          if [[ ${#LAMBDA_DIRS[@]} == 0 ]]; then
+          if [[ ${#SELECTED_DIRS[@]} == 0 ]]; then
             msg="No valid directory in the input"
             msg="$msg, No deployment launched"
-            msg="$msg. Please make sure to put in the correct lambda directory names"
+            msg="$msg. Please put in the correct directory names"
 
             echo "::notice::$msg"
           fi
 
-          LAMBDA_DIRS="$(jq -n '$ARGS.positional' -c '.' --args "${LAMBDA_DIRS[@]}")"
-          echo "LAMBDA_DIRS=$LAMBDA_DIRS" >> $GITHUB_ENV
+          SELECTED_DIRS="$(jq -n '$ARGS.positional' -c '.' --args "${SELECTED_DIRS[@]}")"
+          echo "SELECTED_DIRS=$SELECTED_DIRS" >> $GITHUB_ENV
 
-      - name: Get lambda directories from the last git commit
-        if: env.INPUT_LAMBDA_NAMES == ''
+      - name: Get directories from the last git commit
+        if: env.WORKFLOW_DISPATCH_INPUT_DIRECTORIES == ''
         run: |
-          echo "::notice::Auto-detecting lambda directories changed in the last commit in the '$BRANCH_NAME' branch"
+          echo "::notice::Auto-detecting directories in the last commit in the '$BRANCH_NAME' branch"
 
           cd "${{ env.WORKING_DIRECTORY }}"
 
-          mapfile -t DIRECTORIES <<< "$(git diff --relative --name-only HEAD^1 HEAD | grep / | cut -d/ -f1 | sort -u)"
-          LAMBDA_DIRS=()
-          for d in "${DIRECTORIES[@]}"; do
+          mapfile -t MODIFIED_DIRECTORIES <<< "$(git diff --relative --name-only HEAD^1 HEAD | grep / | cut -d/ -f1 | sort -u)"
+          SELECTED_DIRS=()
+          for d in "${MODIFIED_DIRECTORIES[@]}"; do
             d="$(echo "$d" | xargs)"
-            if [[ -n "$d" ]]; then
-              LAMBDA_DIRS+=("$d")
+            if [[ (-n "$d") && (-d "$d") ]]; then
+              SELECTED_DIRS+=("$d")
             fi
           done
 
-          if [[ ${#LAMBDA_DIRS[@]} == 0 ]]; then
-            msg="No lambda directory change detected in the last commit"
+          if [[ ${#SELECTED_DIRS[@]} == 0 ]]; then
+            msg="No directory change detected in the last commit"
             msg="$msg, No deployment launched"
             msg="$msg. But you can always force a deployment by manually starting the workflow and providing the directory names"
 
             echo "::notice::$msg"
           fi
 
-          LAMBDA_DIRS="$(jq -n '$ARGS.positional' -c '.' --args "${LAMBDA_DIRS[@]}")"
-          echo "LAMBDA_DIRS=$LAMBDA_DIRS" >> $GITHUB_ENV
+          SELECTED_DIRS="$(jq -n '$ARGS.positional' -c '.' --args "${SELECTED_DIRS[@]}")"
+          echo "SELECTED_DIRS=$SELECTED_DIRS" >> $GITHUB_ENV
 
       - name: Launch jobs
         id: launch_jobs
@@ -128,7 +126,7 @@ jobs:
           branches="$(jq -n '$ARGS.positional' -c '.' --args "${branches[@]}")"
 
           echo "branches=$branches" >> $GITHUB_OUTPUT
-          echo "directories=$LAMBDA_DIRS" >> $GITHUB_OUTPUT
+          echo "directories=$SELECTED_DIRS" >> $GITHUB_OUTPUT
 
   deployment:
     name: Deployment
@@ -141,7 +139,8 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ needs.deployment_launcher.outputs.directories != '[]' }}
     steps:
-      - name: Starting deployment job for ${{ matrix.directory }} on branch ${{ matrix.branch }}
+      - name: Starting deployment job for ${{ matrix.directory }} on branch ${{
+          matrix.branch }}
         run: |
           BRANCH_NAME="${{ matrix.branch }}"
           LAMBDA_DIRECTORY="${{ matrix.directory }}"
@@ -243,5 +242,5 @@ jobs:
 
       - name: Deploy lambda
         run: |
-
+          
           ls -l "${{ env.LAMBDA_PACKAGE_FILE_PATH }}"
