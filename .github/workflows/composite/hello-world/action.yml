@@ -7,6 +7,17 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Git Checkout
+      uses: actions/checkout@v6
+      with:
+        clean: true
+        fetch-depth: 1
+
     - shell: bash
       run: |
-        echo "Hello ${{ inputs.who-to-greet }}."
+        ls -la
+
+    - shell: bash
+      run: |
+        echo "::notice::Hello ${{ inputs.who-to-greet }}"
+        echo "ENV_SET_IN_COMPOSITE_ACTION=This is a value set in the composite action" >> $GITHUB_ENV

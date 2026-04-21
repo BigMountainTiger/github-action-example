@@ -12,12 +12,15 @@ name: A00_from_feature_branch
 on:
   push:
     # Need to push from feature/example branch to trigger the workflow
-    branches: [feature/example]
+    branches:
+      - feature/example
     paths:
       - "**"
 
+  workflow_dispatch:
+
 jobs:
   basic:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - run: aws --version

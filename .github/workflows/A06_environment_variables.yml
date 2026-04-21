@@ -1,4 +1,4 @@
-name: A04_environment_variables
+name: A06_environment_variables
 env:
   # Global environment variables can be defineed here
   global_env: "This is a global environment variable"

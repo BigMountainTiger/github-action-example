@@ -1,0 +1,21 @@
+name: A10_composite_example
+
+on: workflow_dispatch
+
+jobs:
+  composite_example:
+    name: Composite Example
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Run Action
+        uses: ./.github/workflows/composite/hello-world
+        with:
+          who-to-greet: "GitHub User"
+
+      - name: Get Environment Variable from Composite Action
+        run: |
+          echo "::notice::$ENV_SET_IN_COMPOSITE_ACTION"

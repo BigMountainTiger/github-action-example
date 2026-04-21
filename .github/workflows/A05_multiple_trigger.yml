@@ -1,4 +1,4 @@
-name: A09_multiple_trigger
+name: A05_multiple_trigger
 
 on:
   push:

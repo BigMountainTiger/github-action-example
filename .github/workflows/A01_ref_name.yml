@@ -1,0 +1,27 @@
+name: A01_ref_name
+
+# 1. The branch of the yaml file being used by the workflow is the github.ref_name
+# 2. It is also the branch of the event that triggered the workflow run, push / pull reqest
+
+# To experiment:
+# Create a branch and test to start job using that branch
+
+on: workflow_dispatch
+
+jobs:
+  what-is-the-ref-name:
+    name: Example Job
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::notice::$(whoami) is running this job"
+          echo "::warning:: $(pwd)"
+
+          echo "::notice::The ref for this workflow run is: ${{ github.ref }}"
+          echo "::notice::The ref name for this workflow run is: ${{ github.ref_name }}"
+
+      - run: |
+          echo "::notice::jq is installed by default"
+          echo "::notice::jq version: $(jq --version)"
+
+          echo "::error::This is a fake error message for demonstration purposes"
