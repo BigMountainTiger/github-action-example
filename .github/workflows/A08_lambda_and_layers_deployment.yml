@@ -1,6 +1,6 @@
-name: A08_lambda_deployment
+name: A08_lambda_and_layers_deployment
 env:
-  PRODUCT_NAME: A08_lambda_deployment
+  PRODUCT_NAME: A08_lambda_and_layers_deployment
   WORKING_DIRECTORY: examples/python
   DEFAULT_PYTHON_VERSION: 3.14
 
@@ -18,7 +18,7 @@ on:
         required: true
         options: [ master, release, develop ]
         default: master
-      lambda_names:
+      workflow-dispatch-input-directories:
         type: string
         description: |
           Comma separated Lambda folder names,
@@ -32,7 +32,7 @@ concurrency:
 jobs:
   deployment_launcher:
     name: Deployment Launcher
-    runs-on: ${{ vars.RUNNERSET_DEFAULT }}
+    runs-on: ubuntu-latest
     outputs:
       branches: ${{ steps.launch_jobs.outputs.branches }}
       directories: ${{ steps.launch_jobs.outputs.directories }}
@@ -137,13 +137,17 @@ jobs:
         branch: ${{ fromJson(needs.deployment_launcher.outputs.branches) }}
         directory: ${{ fromJson(needs.deployment_launcher.outputs.directories) }}
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      security-events: write
     if: ${{ needs.deployment_launcher.outputs.directories != '[]' }}
     steps:
-      - name: Starting deployment job for ${{ matrix.directory }} on branch ${{
-          matrix.branch }}
+      - name: Starting deployment for ${{ matrix.directory }} on ${{ matrix.branch }}
         run: |
           BRANCH_NAME="${{ matrix.branch }}"
-          LAMBDA_DIRECTORY="${{ matrix.directory }}"
+          DIRECTORY_TO_DEPLOY="${{ matrix.directory }}"
 
           declare -A branch_env_map=(
             ["develop"]="dev"
@@ -152,28 +156,27 @@ jobs:
           )
 
           DEPLOY_ENV="${branch_env_map[$BRANCH_NAME]}"
-          LAMBDA_NAME="$LAMBDA_DIRECTORY-$DEPLOY_ENV"
 
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
           echo "DEPLOY_ENV=$DEPLOY_ENV" >> $GITHUB_ENV
-          echo "LAMBDA_NAME=$LAMBDA_NAME" >> $GITHUB_ENV
-          echo "LAMBDA_FULL_DIRECTORY=${{ env.WORKING_DIRECTORY }}/$LAMBDA_DIRECTORY" >> $GITHUB_ENV
+          echo "DIRECTORY_TO_DEPLOY=$DIRECTORY_TO_DEPLOY" >> $GITHUB_ENV
+          echo "DIRECTORY_TO_DEPLOY_FULL_PATH=${{ env.WORKING_DIRECTORY }}/$DIRECTORY_TO_DEPLOY" >> $GITHUB_ENV
 
       - name: Check out
         uses: actions/checkout@v6
         with:
           ref: "${{ env.BRANCH_NAME }}"
-          sparse-checkout: "${{ env.LAMBDA_FULL_DIRECTORY }}"
+          sparse-checkout: "${{ env.DIRECTORY_TO_DEPLOY_FULL_PATH }}"
           fetch-depth: 1
 
       - name: Check if custom python version specified
         run: |
-          if [[ ! -d "$LAMBDA_FULL_DIRECTORY" ]]; then
-            echo "$LAMBDA_FULL_DIRECTORY does not exist" >&2
+          if [[ ! -d "$DIRECTORY_TO_DEPLOY_FULL_PATH" ]]; then
+            echo "$DIRECTORY_TO_DEPLOY_FULL_PATH does not exist" >&2
             exit 1
           fi
 
-          cd "$LAMBDA_FULL_DIRECTORY"
+          cd "$DIRECTORY_TO_DEPLOY_FULL_PATH"
 
           version_file="custom/VERSION.txt"
           if [[ -f "$version_file" ]]; then
@@ -197,50 +200,65 @@ jobs:
 
       - run: python --version
 
-      - name: package lambda
+      - name: package deployment artifact
         run: |
-          WORKSPACE=".lambda_package_zip"
-          PACKAGE_FILE_NAME="lambda.zip"
+          package_type="lambda"
+          # lambda / layer
+
+          WORKSPACE=".deployment_artifact_workspace"
+          PACKAGE_FILE_NAME="artifact.zip"
+
+          PACKAGE_DIRECTORY="$WORKSPACE/package_directory"
+          INSTALL_DIRECTORY="$PACKAGE_DIRECTORY"
+          if [ "$package_type" == "layer" ]; then
+              INSTALL_DIRECTORY="$PACKAGE_DIRECTORY/python"
+          fi
 
           (
-            rm -rf $WORKSPACE && mkdir -p $WORKSPACE
-            cp -r $LAMBDA_FULL_DIRECTORY $WORKSPACE/lambda
+            rm -rf $WORKSPACE && mkdir -p $INSTALL_DIRECTORY
+            rm -rf $INSTALL_DIRECTORY && cp -r $DIRECTORY_TO_DEPLOY_FULL_PATH $INSTALL_DIRECTORY
           )
 
           (
+            cd $INSTALL_DIRECTORY
+
             REQUIREMENTS="requirements.txt"
-            cd $WORKSPACE/lambda
+            CUSTOM_INSTALL="custom/install"
 
-            custom_install="custom/install"
-            if [[ -f "$custom_install" ]]; then
-              echo "Found custom install script, using it to install the dependencies"
-              . "$custom_install"
+            if [[ -f $CUSTOM_INSTALL ]]; then
+                echo "Found custom install script, using it to install the dependencies"
+                . $CUSTOM_INSTALL
             else
-              if [ -f "$REQUIREMENTS" ]; then
-                if ! [ -x "$(command -v pip)" ]; then
-                    echo 'pip is not installed, we need pip to create the deployment package' >&2
-                    exit 1
-                fi
+                if [ -f $REQUIREMENTS ]; then
+                  if ! [ -x "$(command -v pip)" ]; then
+                      echo 'pip is not installed, we need pip to create the deployment package' >&2
+                      exit 1
+                  fi
 
-                pip install --platform=manylinux2014_x86_64 --only-binary=:all: \
-                  -r "$REQUIREMENTS" -t .
-              fi
+                  pip install --platform=manylinux2014_x86_64 --only-binary=:all: \
+                      -r $REQUIREMENTS -t .
+                fi
             fi
 
             find . -type d -name "__pycache__" -exec rm -rf {} +
             rm -f $REQUIREMENTS
             rm -rf custom
+          )
+
+          (
+            cd $PACKAGE_DIRECTORY
 
             ZIP_FILE="../$PACKAGE_FILE_NAME"
             zip -rq $ZIP_FILE .
 
             du -h $ZIP_FILE
-            echo "Created the deployment package"
+            echo "Created the deployment package $ZIP_FILE"
           )
 
-          echo "LAMBDA_PACKAGE_FILE_PATH=$WORKSPACE/$PACKAGE_FILE_NAME" >> $GITHUB_ENV
+          echo "PACKAGE_FILE_PATH=$WORKSPACE/$PACKAGE_FILE_NAME" >> $GITHUB_ENV
 
-      - name: Deploy lambda
+      - name: Deployment
         run: |
           
-          ls -l "${{ env.LAMBDA_PACKAGE_FILE_PATH }}"
+          ls -l $PACKAGE_FILE_PATH
+          du -h $PACKAGE_FILE_PATH

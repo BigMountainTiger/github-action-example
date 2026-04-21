@@ -4,5 +4,5 @@ import json
 def lambdaHandler(event, context):
     return {
         'statusCode': 200,
-        'body': 'OK'
+        'body': 'This is the simplest lambda example'
     }

@@ -1,0 +1,12 @@
+name: A09_composite
+
+on: workflow_dispatch
+
+jobs:
+  example-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Action
+        uses: ./.github/actions/hello-world
+        with:
+          who-to-greet: "GitHub User"
